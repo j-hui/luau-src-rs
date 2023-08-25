@@ -69,7 +69,7 @@ jobs:
       uses: ryanwinter/arm-none-eabi-gcc@master
       with:
         release: '10.3-2021.10'
-    - name: Build ${{ matrix.lua }}
+    - name: Build Luau
       run: |
         cargo build --manifest-path testcrate/Cargo.toml --target ${{ matrix.target }} --release --no-default-features
       shell: bash
