@@ -46,6 +46,34 @@ jobs:
         cargo build --manifest-path testcrate/Cargo.toml --target ${{ matrix.target }} --release
       shell: bash
 
+  cross-compile:
+    name: Cross-compilation
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+        - thumbv6m-none-eabi
+        - thumbv7m-none-eabi
+        - thumbv7em-none-eabi
+        - thumbv7em-none-eabihf
+        - thumbv8m.main-none-eabi
+        - thumbv8m.main-none-eabihf
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        target: ${{ matrix.target }}
+        components: rust-src
+    - name: Install Arm GCC (${{ matrix.target }})
+      if: startsWith(matrix.target, 'thumbv')
+      uses: ryanwinter/arm-none-eabi-gcc@master
+      with:
+        release: '10.3-2021.10'
+    - name: Build ${{ matrix.lua }}
+      run: |
+        cargo build --manifest-path testcrate/Cargo.toml --target ${{ matrix.target }} --release --no-default-features
+      shell: bash
+
   test:
     name: Test
     runs-on: ${{ matrix.os }}
