@@ -1,4 +1,9 @@
-use std::os::raw::{c_char, c_int, c_long, c_void};
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "std")]
+extern crate core;
+
+use core::ffi::{c_char, c_int, c_long, c_void};
 
 #[repr(C)]
 #[allow(non_snake_case, non_camel_case_types)]
