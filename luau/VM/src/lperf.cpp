@@ -57,7 +57,8 @@ static double clock_timestamp()
 
 double lua_clock()
 {
-    static double period = clock_period();
-
-    return clock_timestamp() * period;
+  return 0.0;
+    // static double period = clock_period();
+    //
+    // return clock_timestamp() * period;
 }

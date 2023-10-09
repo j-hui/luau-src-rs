@@ -14,6 +14,8 @@ pub struct Build {
     enable_codegen: bool,
     // Vector size, must be 3 (default) or 4
     vector_size: usize,
+    // Don't depend on the presence of a standard library (e.g., libc++)
+    no_std: bool,
 }
 
 pub struct Artifacts {
@@ -34,6 +36,7 @@ impl Build {
             use_longjmp: false,
             enable_codegen: false,
             vector_size: 3,
+            no_std: false,
         }
     }
 
@@ -73,7 +76,20 @@ impl Build {
         self
     }
 
+    pub fn no_std(&mut self, no_std: bool) -> &mut Build {
+        self.no_std = no_std;
+        self
+    }
+
     pub fn build(&mut self) -> Artifacts {
+        if self.no_std {
+            assert!(
+                !self.enable_codegen,
+                "codegen is not supported for no_std environments"
+            );
+            // self.use_longjmp(true);
+        }
+
         let target = &self.target.as_ref().expect("TARGET not set")[..];
         let host = &self.host.as_ref().expect("HOST not set")[..];
         let out_dir = self.out_dir.as_ref().expect("OUT_DIR not set");
@@ -133,6 +149,64 @@ impl Build {
             config.opt_level(2);
             // this flag allows compiler to lower sqrt() into a single CPU instruction
             config.flag_if_supported("-fno-math-errno");
+        }
+
+        if self.no_std {
+            // Build VM
+            let vm_lib_name = "luauvm";
+            config
+                .include(&vm_include_dir)
+                .include(&common_include_dir)
+                .flag("-Os")
+                .define("LUA_API", "extern \"C\"")
+                .define("LUA_API", "extern \"C\"")
+                .define("LUA_USE_LONGJMP", "1")
+                .define("LUAU_EMBEDDED", None);
+
+            config
+                .file(vm_source_dir.join("lapi.cpp"))
+                .file(vm_source_dir.join("laux.cpp"))
+                .file(vm_source_dir.join("lbaselib.cpp"))
+                .file(vm_source_dir.join("lbitlib.cpp"))
+                .file(vm_source_dir.join("lbuiltins.cpp"))
+                .file(vm_source_dir.join("lcorolib.cpp"))
+                .file(vm_source_dir.join("ldblib.cpp"))
+                .file(vm_source_dir.join("ldebug.cpp"))
+                .file(vm_source_dir.join("ldo.cpp"))
+                .file(vm_source_dir.join("lfunc.cpp"))
+                .file(vm_source_dir.join("lgc.cpp"))
+                .file(vm_source_dir.join("lgcdebug.cpp"))
+                .file(vm_source_dir.join("linit.cpp"))
+                // Skipped: lmathlib.cpp
+                .file(vm_source_dir.join("lmem.cpp"))
+                .file(vm_source_dir.join("lnumprint.cpp"))
+                .file(vm_source_dir.join("lobject.cpp"))
+                // Skipped: loslib.cpp
+                .file(vm_source_dir.join("lperf.cpp"))
+                .file(vm_source_dir.join("lstate.cpp"))
+                .file(vm_source_dir.join("lstring.cpp"))
+                .file(vm_source_dir.join("lstrlib.cpp"))
+                .file(vm_source_dir.join("ltable.cpp"))
+                .file(vm_source_dir.join("ltablib.cpp"))
+                .file(vm_source_dir.join("ltm.cpp"))
+                .file(vm_source_dir.join("ludata.cpp"))
+                .file(vm_source_dir.join("lutf8lib.cpp"))
+                .file(vm_source_dir.join("lvmexecute.cpp"))
+                .file(vm_source_dir.join("lvmload.cpp"))
+                .file(vm_source_dir.join("lvmutils.cpp"));
+
+            config.out_dir(&lib_dir).compile(vm_lib_name);
+
+            for f in &["lua.h", "luaconf.h", "lualib.h"] {
+                fs::copy(vm_include_dir.join(f), include_dir.join(f)).unwrap();
+            }
+
+            return Artifacts {
+                lib_dir,
+                include_dir,
+                libs: vec![vm_lib_name.to_string()],
+                cpp_stdlib: None,
+            };
         }
 
         // Build Ast
